@@ -4,7 +4,6 @@
 
 use crate::ollama;
 use crate::system;
-use serde::Serialize;
 
 // ============================================================================
 // System info
@@ -47,11 +46,6 @@ pub async fn delete_ollama_model(name: String) -> Result<(), String> {
 // ============================================================================
 // Snapshots (placeholder — implement next)
 // ============================================================================
-
-#[derive(Serialize)]
-pub struct SnapshotResult {
-    pub id: String,
-}
 
 #[tauri::command]
 pub async fn create_snapshot(label: String) -> Result<String, String> {

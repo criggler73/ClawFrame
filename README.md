@@ -78,7 +78,8 @@ npm run tauri:build
 
 Output:
 
-- **Windows**: `src-tauri/target/release/bundle/msi/ClawFrame_0.1.0_x64_en-US.msi`
+- **Windows (MSI)**: `src-tauri/target/release/bundle/msi/ClawFrame_0.1.0_x64_en-US.msi`
+- **Windows (setup EXE)**: `src-tauri/target/release/bundle/nsis/ClawFrame_0.1.0_x64-setup.exe`
 - **macOS**: `src-tauri/target/release/bundle/dmg/ClawFrame_0.1.0_aarch64.dmg`
 
 These are unsigned. To distribute publicly without scaring users, you'll need code signing — see [Distribution](#distribution) below.
@@ -106,7 +107,8 @@ clawframe/
 │   ├── tauri.conf.json           Window size, bundle config, identifier
 │   ├── capabilities/default.json Tauri 2 permission grants
 │   └── src/
-│       ├── main.rs               App entry, plugin registration
+│       ├── main.rs               Desktop entry point
+│       ├── lib.rs                App builder and command registration
 │       ├── commands.rs           #[tauri::command] handlers
 │       ├── system.rs             OS / hardware / dependency probes
 │       └── ollama.rs             Ollama HTTP client
@@ -137,7 +139,7 @@ The frontend never imports `@tauri-apps/api` directly — everything goes throug
 
 1. **Rust logic** — add a function in the right module (`system.rs`, `ollama.rs`, or a new file).
 2. **Command handler** — add a thin `#[tauri::command]` in `commands.rs` that calls your function.
-3. **Register** — add the handler name to `invoke_handler![ ... ]` in `main.rs`.
+3. **Register** — add the handler name to `invoke_handler![ ... ]` in `lib.rs`.
 4. **TypeScript wrapper** — add a method in `src/lib/api.ts` with matching types.
 5. **Use it** — call `api.yourCommand()` from any React component.
 

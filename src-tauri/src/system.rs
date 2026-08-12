@@ -78,10 +78,7 @@ pub async fn detect_components() -> Result<Vec<ComponentStatus>> {
 /// Run `cmd args...` and capture the first line of stdout as the version.
 /// Returns installed=false if the command can't be run.
 async fn detect_command(name: &str, cmd: &str, args: &[&str]) -> ComponentStatus {
-    let output = tokio::process::Command::new(cmd)
-        .args(args)
-        .output()
-        .await;
+    let output = tokio::process::Command::new(cmd).args(args).output().await;
 
     match output {
         Ok(out) if out.status.success() => {
@@ -91,9 +88,7 @@ async fn detect_command(name: &str, cmd: &str, args: &[&str]) -> ComponentStatus
                 name: name.into(),
                 installed: true,
                 version,
-                detected_path: which::which(cmd)
-                    .ok()
-                    .map(|p| p.display().to_string()),
+                detected_path: which::which(cmd).ok().map(|p| p.display().to_string()),
             }
         }
         _ => ComponentStatus {
