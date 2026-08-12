@@ -1,0 +1,47 @@
+[package]
+name = "clawframe"
+version = "0.1.0"
+description = "Managed installer & control console for OpenClaw / NemoClaw"
+authors = ["You"]
+edition = "2021"
+
+[lib]
+name = "clawframe_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-os = "2"
+tauri-plugin-http = "2"
+tauri-plugin-store = "2"
+
+# JSON
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async runtime + HTTP for Ollama
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+
+# System info — cross-platform
+sysinfo = "0.32"
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+# Find executables on PATH (cross-platform)
+which = "7"
+
+# Timestamps for snapshots, logs, etc.
+chrono = { version = "0.4", features = ["serde"] }
+
+[features]
+# this feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]

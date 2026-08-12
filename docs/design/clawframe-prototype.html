@@ -1,0 +1,3011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ClawFrame — Managed Installer & Control Console for OpenClaw</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-0: #0a0b0d;
+    --bg-1: #101216;
+    --bg-2: #15181d;
+    --bg-3: #1c2027;
+    --line: #232831;
+    --line-bright: #2e3540;
+    --text-0: #f4f5f7;
+    --text-1: #c9ced8;
+    --text-2: #8a909c;
+    --text-3: #5a606b;
+    --accent: #c4f04a;        /* signature lime — only sparingly */
+    --accent-dim: #8eaf2c;
+    --accent-glow: rgba(196, 240, 74, 0.15);
+    --danger: #ff6b5b;
+    --warn: #ffb84d;
+    --ok: #4ad29a;
+    --info: #6db3ff;
+    --radius: 6px;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --display: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg-0);
+    color: var(--text-0);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Background grid texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    opacity: 0.25;
+    pointer-events: none;
+    z-index: 0;
+    mask-image: radial-gradient(ellipse at center, black 0%, transparent 80%);
+  }
+
+  /* === TOP BAR === */
+  .topbar {
+    position: relative;
+    z-index: 10;
+    height: 48px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(10, 11, 13, 0.85);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .topbar .logo {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 600; letter-spacing: -0.01em;
+  }
+  .topbar .logo-mark {
+    width: 18px; height: 18px;
+    background: var(--accent);
+    clip-path: polygon(0 0, 100% 0, 100% 70%, 70% 100%, 0 100%);
+  }
+  .topbar .logo-name {
+    font-family: var(--sans); font-size: 14px; font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .topbar .logo-name span { color: var(--accent); }
+  .topbar .breadcrumb {
+    color: var(--text-3);
+    margin-left: 12px;
+  }
+  .topbar .breadcrumb b { color: var(--text-1); font-weight: 500; }
+  .topbar .spacer { flex: 1; }
+  .topbar .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    color: var(--text-2);
+  }
+  .topbar .pill .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--ok);
+    box-shadow: 0 0 8px var(--ok);
+  }
+  .topbar .topbar-btn {
+    background: none; border: none; color: var(--text-2);
+    font-family: var(--mono); font-size: 12px; cursor: pointer;
+    padding: 4px 8px; border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .topbar .topbar-btn:hover { color: var(--text-0); background: var(--bg-2); }
+
+  /* === STAGE === */
+  #stage {
+    position: relative;
+    z-index: 1;
+    min-height: calc(100vh - 48px);
+  }
+
+  .view { display: none; }
+  .view.active { display: block; animation: viewIn 0.5s ease; }
+
+  @keyframes viewIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ============================================ */
+  /* WIZARD VIEW                                  */
+  /* ============================================ */
+  .wizard {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    min-height: calc(100vh - 48px);
+  }
+
+  .wizard-rail {
+    border-right: 1px solid var(--line);
+    background: var(--bg-1);
+    padding: 32px 24px;
+    display: flex; flex-direction: column;
+  }
+
+  .wizard-rail .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .wizard-rail .title {
+    font-family: var(--display);
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 4px;
+  }
+  .wizard-rail .title em {
+    font-style: normal;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .wizard-rail .subtitle {
+    font-size: 13px;
+    color: var(--text-2);
+    margin-bottom: 32px;
+    line-height: 1.5;
+  }
+
+  .step-list {
+    list-style: none;
+    flex: 1;
+  }
+
+  .step-list li {
+    position: relative;
+    padding: 10px 0 10px 28px;
+    font-size: 13px;
+    color: var(--text-3);
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+
+  .step-list li::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 18px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--line-bright);
+    transition: all 0.2s;
+  }
+
+  .step-list li::after {
+    content: '';
+    position: absolute;
+    left: 8.5px;
+    top: 28px;
+    width: 1px;
+    height: calc(100% - 16px);
+    background: var(--line);
+  }
+
+  .step-list li:last-child::after { display: none; }
+
+  .step-list li.done { color: var(--text-2); }
+  .step-list li.done::before {
+    background: var(--accent-dim);
+  }
+  .step-list li.done::after { background: var(--accent-dim); }
+
+  .step-list li.current { color: var(--text-0); font-weight: 500; }
+  .step-list li.current::before {
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-glow);
+  }
+
+  .step-list .num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    margin-right: 6px;
+  }
+
+  .wizard-rail .footnote {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    line-height: 1.6;
+  }
+
+  .wizard-main {
+    padding: 64px 80px;
+    overflow-y: auto;
+    max-height: calc(100vh - 48px);
+  }
+
+  .wizard-content {
+    max-width: 640px;
+  }
+
+  .step-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+
+  .step-heading {
+    font-family: var(--display);
+    font-size: 48px;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+    margin-bottom: 20px;
+  }
+  .step-heading em {
+    font-style: normal;
+    color: var(--text-2);
+    font-weight: 400;
+  }
+
+  .step-lede {
+    font-size: 16px;
+    color: var(--text-1);
+    line-height: 1.6;
+    margin-bottom: 40px;
+    max-width: 540px;
+  }
+
+  /* Detect cards (system scan) */
+  .detect-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .detect-card {
+    border: 1px solid var(--line);
+    background: var(--bg-1);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: border-color 0.2s;
+  }
+  .detect-card:hover { border-color: var(--line-bright); }
+
+  .detect-icon {
+    width: 36px; height: 36px;
+    border-radius: 4px;
+    background: var(--bg-3);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-1);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .detect-card.ok .detect-icon { color: var(--accent); background: rgba(196,240,74,0.08); }
+  .detect-card.warn .detect-icon { color: var(--warn); background: rgba(255,184,77,0.08); }
+
+  .detect-body { flex: 1; min-width: 0; }
+  .detect-label {
+    font-size: 12px;
+    color: var(--text-3);
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .detect-value {
+    font-size: 14px;
+    color: var(--text-0);
+    margin-top: 2px;
+    font-weight: 500;
+  }
+  .detect-status {
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .detect-status.ok { color: var(--accent); }
+  .detect-status.warn { color: var(--warn); }
+
+  /* Dependency list */
+  .dep-list {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-1);
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+
+  .dep-row {
+    display: grid;
+    grid-template-columns: 36px 1fr auto auto;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .dep-row:last-child { border-bottom: none; }
+
+  .dep-check {
+    width: 18px; height: 18px;
+    border: 1.5px solid var(--line-bright);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .dep-check.checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .dep-check.checked::after {
+    content: '';
+    width: 5px; height: 9px;
+    border-right: 2px solid var(--bg-0);
+    border-bottom: 2px solid var(--bg-0);
+    transform: rotate(45deg) translate(-1px, -1px);
+  }
+
+  .dep-name { font-weight: 500; font-size: 14px; }
+  .dep-name .dep-desc {
+    display: block;
+    font-size: 12px;
+    color: var(--text-3);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .dep-version {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-2);
+    padding: 3px 8px;
+    border: 1px solid var(--line);
+    border-radius: 100px;
+  }
+
+  .dep-status {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+  }
+  .dep-status.missing { color: var(--warn); }
+
+  /* Channel selection */
+  .channel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .channel-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    background: var(--bg-1);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .channel-card:hover { border-color: var(--line-bright); }
+  .channel-card.selected {
+    border-color: var(--accent);
+    background: linear-gradient(135deg, rgba(196,240,74,0.04), transparent);
+  }
+  .channel-card .channel-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+  .channel-card.selected .channel-tag { color: var(--accent); }
+  .channel-card .channel-name {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+  }
+  .channel-card .channel-version {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-2);
+    margin-bottom: 12px;
+  }
+  .channel-card .channel-desc {
+    font-size: 12px;
+    color: var(--text-3);
+    line-height: 1.5;
+  }
+
+  /* Wizard footer */
+  .wizard-footer {
+    margin-top: 48px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+
+  .btn {
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line-bright);
+    background: var(--bg-2);
+    color: var(--text-0);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn:hover { background: var(--bg-3); border-color: var(--text-3); }
+
+  .btn.primary {
+    background: var(--accent);
+    color: var(--bg-0);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .btn.primary:hover {
+    background: #d3ff58;
+    box-shadow: 0 0 24px var(--accent-glow);
+  }
+
+  .btn.ghost {
+    background: none;
+    border-color: transparent;
+    color: var(--text-2);
+  }
+  .btn.ghost:hover { color: var(--text-0); background: var(--bg-2); }
+
+  .btn .arrow { font-family: var(--mono); }
+
+  .wizard-footer .meta {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+  }
+
+  /* Install progress (final step) */
+  .install-log {
+    background: var(--bg-0);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    max-height: 280px;
+    overflow-y: auto;
+    margin-bottom: 24px;
+  }
+  .install-log .log-line { color: var(--text-2); }
+  .install-log .log-line .ts { color: var(--text-3); margin-right: 8px; }
+  .install-log .log-line .tag { color: var(--accent); margin-right: 8px; }
+  .install-log .log-line.ok .tag { color: var(--ok); }
+  .install-log .log-line.warn .tag { color: var(--warn); }
+
+  .install-progress {
+    height: 4px;
+    background: var(--bg-3);
+    border-radius: 100px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .install-progress .bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    width: 0%;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+
+  .install-meta {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    margin-bottom: 24px;
+  }
+
+  /* Completion screen */
+  .completion {
+    text-align: center;
+    padding: 64px 0;
+  }
+  .completion .check-mark {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    background: var(--accent-glow);
+    border: 2px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 32px;
+    position: relative;
+  }
+  .completion .check-mark::before {
+    content: '';
+    width: 24px; height: 12px;
+    border-left: 2px solid var(--accent);
+    border-bottom: 2px solid var(--accent);
+    transform: rotate(-45deg) translate(2px, -2px);
+  }
+  .completion h2 {
+    font-family: var(--display);
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    margin-bottom: 12px;
+  }
+  .completion p {
+    color: var(--text-2);
+    margin-bottom: 32px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* ============================================ */
+  /* CONSOLE VIEW                                 */
+  /* ============================================ */
+  .console {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: calc(100vh - 48px);
+  }
+
+  .sidebar {
+    border-right: 1px solid var(--line);
+    background: var(--bg-1);
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-section {
+    padding: 0 16px;
+    margin-bottom: 24px;
+  }
+
+  .sidebar-section .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0 10px 8px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 5px;
+    color: var(--text-2);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--bg-2); color: var(--text-0); }
+  .nav-item.active {
+    background: var(--bg-3);
+    color: var(--text-0);
+  }
+  .nav-item.active::before {
+    content: '';
+    width: 2px; height: 14px;
+    background: var(--accent);
+    margin-left: -10px;
+    margin-right: 8px;
+    border-radius: 2px;
+  }
+  .nav-item .nav-icon {
+    width: 14px; height: 14px;
+    color: var(--text-3);
+    flex-shrink: 0;
+  }
+  .nav-item.active .nav-icon { color: var(--accent); }
+
+  .nav-item .badge {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    background: var(--bg-3);
+    padding: 1px 6px;
+    border-radius: 100px;
+  }
+
+  .sidebar-foot {
+    margin-top: auto;
+    padding: 16px;
+    border-top: 1px solid var(--line);
+  }
+  .runtime-status {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    background: var(--bg-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-2);
+    line-height: 1.4;
+  }
+  .runtime-status .pulse {
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--ok);
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--ok); }
+    50% { opacity: 0.5; box-shadow: 0 0 0 4px transparent; }
+  }
+  .runtime-status .uptime { color: var(--text-3); }
+
+  /* Main area */
+  .main {
+    padding: 32px 40px;
+    overflow-y: auto;
+    max-height: calc(100vh - 48px);
+  }
+
+  .main-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .main-header .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .main-header h1 {
+    font-family: var(--display);
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+  }
+  .main-header h1 em { color: var(--text-2); font-style: normal; font-weight: 400; }
+  .main-header .actions { display: flex; gap: 8px; }
+
+  /* Stat grid */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    background: var(--bg-1);
+    position: relative;
+    overflow: hidden;
+  }
+  .stat::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 2px; height: 100%;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .stat:hover::before { opacity: 0.6; }
+  .stat .stat-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+  .stat .stat-value {
+    font-family: var(--display);
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1;
+  }
+  .stat .stat-unit { font-size: 14px; color: var(--text-3); margin-left: 4px; font-family: var(--mono); }
+  .stat .stat-trend {
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-top: 8px;
+    color: var(--text-2);
+  }
+  .stat .stat-trend.up { color: var(--ok); }
+  .stat .stat-trend.down { color: var(--danger); }
+
+  /* Two column */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-1);
+    padding: 20px;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .panel-header h3 {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .panel-header .panel-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+  }
+
+  /* Sparkline chart */
+  .sparkline {
+    width: 100%;
+    height: 140px;
+    position: relative;
+  }
+  .sparkline svg { width: 100%; height: 100%; display: block; }
+  .axis-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    fill: var(--text-3);
+  }
+
+  /* Component table */
+  .component-table {
+    width: 100%;
+    font-size: 13px;
+  }
+  .component-table thead th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+    padding: 0 12px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .component-table tbody td {
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+    color: var(--text-1);
+  }
+  .component-table tbody tr:last-child td { border-bottom: none; }
+  .component-table .name {
+    font-weight: 500;
+    color: var(--text-0);
+  }
+  .component-table .v {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .component-table .status-pill {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    border: 1px solid var(--line);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .component-table .status-pill .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+  }
+  .component-table .status-pill.running { color: var(--ok); border-color: rgba(74,210,154,0.3); }
+  .component-table .status-pill.running .dot { background: var(--ok); }
+  .component-table .status-pill.idle { color: var(--text-3); }
+  .component-table .status-pill.idle .dot { background: var(--text-3); }
+  .component-table .status-pill.warn { color: var(--warn); border-color: rgba(255,184,77,0.3); }
+  .component-table .status-pill.warn .dot { background: var(--warn); }
+
+  /* Activity feed */
+  .activity {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .activity-item {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 12px;
+    align-items: start;
+    font-size: 13px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .activity-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .activity-time {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    padding-top: 1px;
+  }
+  .activity-msg { color: var(--text-1); line-height: 1.5; }
+  .activity-msg b { color: var(--text-0); font-weight: 500; }
+  .activity-msg .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--bg-3);
+    color: var(--text-2);
+    margin-right: 4px;
+  }
+
+  /* Quick actions */
+  .quick-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .quick-action {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px;
+    background: var(--bg-2);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+    color: var(--text-1);
+    font-family: var(--sans);
+  }
+  .quick-action:hover {
+    border-color: var(--accent);
+    background: var(--bg-3);
+  }
+  .quick-action .qa-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-0);
+    margin-bottom: 2px;
+  }
+  .quick-action .qa-desc {
+    font-size: 11px;
+    color: var(--text-3);
+    font-family: var(--mono);
+  }
+
+  /* Footer ribbon */
+  .ribbon {
+    margin-top: 32px;
+    padding: 14px 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-1);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .ribbon b { color: var(--text-1); font-weight: 500; }
+  .ribbon .ribbon-spacer { flex: 1; }
+  .ribbon a { color: var(--accent); text-decoration: none; }
+
+  /* ============================================ */
+  /* MODELS PAGE                                  */
+  /* ============================================ */
+  .models-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 24px;
+  }
+  .models-tab {
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    color: var(--text-2);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .models-tab:hover { color: var(--text-0); }
+  .models-tab.active {
+    color: var(--text-0);
+    border-bottom-color: var(--accent);
+  }
+  .models-tab .tab-count {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--bg-3);
+    color: var(--text-2);
+    padding: 1px 6px;
+    border-radius: 100px;
+  }
+
+  .models-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  .search-input {
+    flex: 1;
+    max-width: 360px;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--text-0);
+    padding: 8px 12px 8px 32px;
+    font-family: var(--sans);
+    font-size: 13px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%238a909c' stroke-width='1.5'><circle cx='7' cy='7' r='5'/><line x1='11' y1='11' x2='14' y2='14'/></svg>");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+  }
+  .search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background-color: var(--bg-2);
+  }
+  .filter-chip {
+    padding: 7px 12px;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--text-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: all 0.15s;
+  }
+  .filter-chip:hover { color: var(--text-0); border-color: var(--line-bright); }
+  .filter-chip.active {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(196,240,74,0.05);
+  }
+
+  /* Storage bar */
+  .storage-panel {
+    border: 1px solid var(--line);
+    background: var(--bg-1);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .storage-panel .storage-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .storage-panel .storage-num {
+    font-family: var(--display);
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-top: 2px;
+  }
+  .storage-panel .storage-num .unit {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-3); margin-left: 4px; font-weight: 400;
+  }
+  .storage-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-3);
+    border-radius: 100px;
+    overflow: hidden;
+    display: flex;
+    min-width: 200px;
+  }
+  .storage-bar-seg {
+    height: 100%;
+    transition: width 0.3s;
+  }
+  .storage-legend {
+    display: flex;
+    gap: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-2);
+  }
+  .storage-legend .leg {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .storage-legend .leg .sw {
+    width: 8px; height: 8px; border-radius: 2px;
+  }
+
+  /* Model cards (catalog) */
+  .model-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+  }
+  .model-card {
+    border: 1px solid var(--line);
+    background: var(--bg-1);
+    border-radius: var(--radius);
+    padding: 18px;
+    transition: all 0.2s;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .model-card:hover {
+    border-color: var(--line-bright);
+    transform: translateY(-1px);
+  }
+  .model-card.installed {
+    border-color: rgba(196,240,74,0.25);
+  }
+  .model-card.installed::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 60px; height: 60px;
+    background: radial-gradient(circle at top right, var(--accent-glow), transparent 70%);
+    pointer-events: none;
+  }
+
+  .model-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .model-icon {
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-1);
+    flex-shrink: 0;
+  }
+  .model-card.installed .model-icon {
+    color: var(--accent);
+    border-color: rgba(196,240,74,0.3);
+    background: rgba(196,240,74,0.05);
+  }
+  .model-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-0);
+    letter-spacing: -0.01em;
+    margin-bottom: 2px;
+  }
+  .model-publisher {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .model-desc {
+    font-size: 12px;
+    color: var(--text-2);
+    line-height: 1.5;
+    margin-bottom: 14px;
+    min-height: 36px;
+  }
+  .model-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .model-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    background: var(--bg-3);
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .model-tag.size { background: rgba(109,179,255,0.08); color: var(--info); }
+  .model-tag.fit-good { background: rgba(74,210,154,0.08); color: var(--ok); }
+  .model-tag.fit-tight { background: rgba(255,184,77,0.08); color: var(--warn); }
+  .model-tag.fit-bad { background: rgba(255,107,91,0.08); color: var(--danger); }
+
+  .model-card-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .model-perf {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-2);
+  }
+  .model-perf b { color: var(--text-0); font-weight: 600; }
+
+  .model-card .pin-marker {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    background: rgba(196,240,74,0.1);
+    border: 1px solid rgba(196,240,74,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+
+  /* Pull progress in card */
+  .pull-progress {
+    margin-top: 8px;
+  }
+  .pull-progress-bar {
+    height: 3px;
+    background: var(--bg-3);
+    border-radius: 100px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .pull-progress-bar > div {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    transition: width 0.2s;
+  }
+  .pull-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    margin-top: 4px;
+  }
+
+  /* Mini button variants */
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 5px;
+  }
+  .btn-icon {
+    width: 28px; height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-icon:hover { color: var(--text-0); border-color: var(--line-bright); }
+  .btn-icon svg { width: 14px; height: 14px; }
+
+  /* Detail drawer */
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(2px);
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+  .drawer {
+    position: fixed;
+    top: 48px;
+    right: 0;
+    bottom: 0;
+    width: 480px;
+    max-width: 100%;
+    background: var(--bg-1);
+    border-left: 1px solid var(--line);
+    z-index: 51;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .drawer.open { transform: translateX(0); }
+
+  .drawer-header {
+    padding: 24px;
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    background: var(--bg-1);
+    z-index: 1;
+  }
+  .drawer-close {
+    position: absolute;
+    top: 18px; right: 18px;
+    background: none;
+    border: none;
+    color: var(--text-3);
+    font-size: 20px;
+    cursor: pointer;
+    width: 28px; height: 28px;
+    border-radius: 4px;
+  }
+  .drawer-close:hover { background: var(--bg-2); color: var(--text-0); }
+  .drawer-title {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+    padding-right: 32px;
+  }
+  .drawer-subtitle {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .drawer-body {
+    padding: 24px;
+    flex: 1;
+  }
+  .drawer-section {
+    margin-bottom: 24px;
+  }
+  .drawer-section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .drawer-section p {
+    font-size: 13px;
+    color: var(--text-1);
+    line-height: 1.6;
+  }
+  .drawer-stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .drawer-stat {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    background: var(--bg-2);
+  }
+  .drawer-stat .ds-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .drawer-stat .ds-value {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-top: 2px;
+    color: var(--text-0);
+  }
+  .drawer-stat .ds-value .unit {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    margin-left: 3px;
+    font-weight: 400;
+  }
+  .drawer-foot {
+    padding: 16px 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    background: var(--bg-1);
+    position: sticky;
+    bottom: 0;
+  }
+
+  /* Benchmark runner */
+  .bench-card {
+    border: 1px solid var(--line);
+    background: var(--bg-2);
+    border-radius: var(--radius);
+    padding: 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .bench-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    color: var(--text-2);
+  }
+  .bench-line b { color: var(--text-0); }
+  .bench-line.live b { color: var(--accent); }
+
+  /* Toast */
+  .toast-host {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .toast {
+    background: var(--bg-2);
+    border: 1px solid var(--line-bright);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    color: var(--text-0);
+    font-size: 13px;
+    min-width: 240px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    animation: toastIn 0.25s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    pointer-events: auto;
+  }
+  .toast.ok { border-left: 3px solid var(--accent); }
+  .toast.warn { border-left: 3px solid var(--warn); }
+  .toast .toast-icon {
+    width: 18px; height: 18px;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .toast.warn .toast-icon { color: var(--warn); }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Mobile menu toggle */
+  .mobile-menu-btn {
+    display: none;
+    background: none;
+    border: 1px solid var(--line);
+    color: var(--text-1);
+    width: 32px; height: 32px;
+    border-radius: 5px;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+  }
+  .mobile-menu-btn svg { width: 16px; height: 16px; }
+
+  /* ============================================ */
+  /* RESPONSIVE                                   */
+  /* ============================================ */
+  @media (max-width: 1100px) {
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .two-col { grid-template-columns: 1fr; }
+    .wizard-main { padding: 48px 48px; }
+    .step-heading { font-size: 40px; }
+    .channel-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 860px) {
+    /* Topbar adapts */
+    .topbar { padding: 0 14px; gap: 10px; }
+    .topbar .breadcrumb { display: none; }
+    .topbar .topbar-btn:not(.menu) { display: none; }
+    .mobile-menu-btn { display: inline-flex; }
+
+    /* Wizard collapses to single column */
+    .wizard {
+      grid-template-columns: 1fr;
+    }
+    .wizard-rail {
+      border-right: none;
+      border-bottom: 1px solid var(--line);
+      padding: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .wizard-rail .title { font-size: 24px; }
+    .wizard-rail .subtitle { margin-bottom: 16px; font-size: 12px; }
+    .step-list { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; }
+    .step-list li {
+      flex-shrink: 0;
+      padding: 8px 12px 8px 24px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .step-list li::after { display: none; }
+    .step-list li::before { left: 8px; top: 50%; transform: translateY(-50%); }
+    .wizard-rail .footnote { display: none; }
+    .wizard-main {
+      padding: 28px 20px;
+      max-height: none;
+    }
+    .step-heading { font-size: 28px; line-height: 1.1; }
+    .step-lede { font-size: 14px; margin-bottom: 24px; }
+    .detect-grid { grid-template-columns: 1fr; }
+    .wizard-footer {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .wizard-footer .meta { margin-left: 0; text-align: center; }
+    .wizard-footer .btn { justify-content: center; }
+
+    /* Console layout — sidebar slides in */
+    .console {
+      grid-template-columns: 1fr;
+    }
+    .sidebar {
+      position: fixed;
+      top: 48px;
+      left: 0;
+      bottom: 0;
+      width: 240px;
+      z-index: 40;
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+      box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+    }
+    .sidebar.open { transform: translateX(0); }
+
+    .sidebar-backdrop {
+      position: fixed;
+      inset: 48px 0 0 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 39;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+
+    .main {
+      padding: 20px 16px;
+      max-height: none;
+    }
+    .main-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .main-header h1 { font-size: 24px; }
+    .main-header .actions { width: 100%; }
+    .main-header .actions .btn { flex: 1; justify-content: center; }
+    .stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat { padding: 12px 14px; }
+    .stat .stat-value { font-size: 22px; }
+
+    .panel { padding: 16px; }
+
+    /* Models page mobile */
+    .model-grid { grid-template-columns: 1fr; }
+    .models-tabs { overflow-x: auto; flex-wrap: nowrap; }
+    .models-tab { white-space: nowrap; padding: 10px 12px; font-size: 12px; }
+    .storage-panel { gap: 12px; }
+    .models-toolbar { flex-wrap: wrap; }
+    .search-input { max-width: none; flex: 1 1 100%; }
+
+    /* Drawer goes full-width */
+    .drawer { width: 100%; }
+
+    /* Component table → collapse less-critical columns */
+    .component-table thead th:nth-child(4) { display: none; }
+    .component-table tbody td:nth-child(4) { display: none; }
+
+    /* Install location step */
+    .ribbon { flex-wrap: wrap; gap: 8px; }
+  }
+
+  @media (max-width: 480px) {
+    .stat-grid { grid-template-columns: 1fr; }
+    .quick-actions { grid-template-columns: 1fr; }
+    .step-heading { font-size: 24px; }
+    .completion h2 { font-size: 28px; }
+    .topbar .logo-name { font-size: 13px; }
+  }
+
+  /* ============================================ */
+  /* SCROLLBAR                                    */
+  /* ============================================ */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg-0); }
+  ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--line-bright); }
+
+  /* Tabs (in-console for non-overview pages) */
+  .empty-page {
+    border: 1px dashed var(--line-bright);
+    border-radius: var(--radius);
+    padding: 64px 24px;
+    text-align: center;
+    color: var(--text-3);
+    background: var(--bg-1);
+  }
+  .empty-page h4 {
+    font-family: var(--display);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-1);
+    margin-bottom: 8px;
+  }
+  .empty-page code {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Open menu">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
+  </button>
+  <div class="logo">
+    <div class="logo-mark"></div>
+    <div class="logo-name">Claw<span>Frame</span></div>
+  </div>
+  <div class="breadcrumb" id="breadcrumb">
+    <span>~</span> / <b id="crumb-state">Setup</b>
+  </div>
+  <div class="spacer"></div>
+  <span class="pill" id="topbar-pill" style="display:none;">
+    <span class="dot"></span> runtime: nemoclaw · v0.4.2
+  </span>
+  <button class="topbar-btn" onclick="goToWizard()">↻ restart wizard</button>
+  <button class="topbar-btn">docs</button>
+  <button class="topbar-btn">⌘K</button>
+</div>
+
+<div id="stage">
+
+<!-- ============================== WIZARD VIEW ============================== -->
+<div class="view active" id="view-wizard">
+  <div class="wizard">
+    <aside class="wizard-rail">
+      <div class="eyebrow">Setup Wizard</div>
+      <h1 class="title">Frame your <em>Claw</em>.</h1>
+      <p class="subtitle">A managed installer for OpenClaw &amp; NemoClaw — local-first, signed, and reversible at every step.</p>
+
+      <ol class="step-list" id="step-list">
+        <li data-step="0" class="current"><span class="num">01</span>Welcome</li>
+        <li data-step="1"><span class="num">02</span>System scan</li>
+        <li data-step="2"><span class="num">03</span>Install location</li>
+        <li data-step="3"><span class="num">04</span>Dependencies</li>
+        <li data-step="4"><span class="num">05</span>Channel &amp; runtime</li>
+        <li data-step="5"><span class="num">06</span>Models &amp; benchmark</li>
+        <li data-step="6"><span class="num">07</span>Integrations</li>
+        <li data-step="7"><span class="num">08</span>Security &amp; policy</li>
+        <li data-step="8"><span class="num">09</span>Review</li>
+        <li data-step="9"><span class="num">10</span>Install &amp; launch</li>
+      </ol>
+
+      <div class="footnote">
+        local-first · signed packages<br/>
+        SHA256 + SBOM verification<br/>
+        rollback-safe · no public APIs by default
+      </div>
+    </aside>
+
+    <main class="wizard-main">
+      <div class="wizard-content" id="wizard-content">
+        <!-- step content gets injected here -->
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ============================== CONSOLE VIEW ============================== -->
+<div class="view" id="view-console">
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleSidebar(false)"></div>
+  <div class="console">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <div class="label">Workspace</div>
+        <div class="nav-item active" data-page="overview">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>
+          Overview
+        </div>
+        <div class="nav-item" data-page="components">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><circle cx="2.5" cy="2.5" r="1.5"/><circle cx="13.5" cy="2.5" r="1.5"/><circle cx="2.5" cy="13.5" r="1.5"/><circle cx="13.5" cy="13.5" r="1.5"/><line x1="3.5" y1="3.5" x2="6.6" y2="6.6"/><line x1="12.5" y1="3.5" x2="9.4" y2="6.6"/><line x1="3.5" y1="12.5" x2="6.6" y2="9.4"/><line x1="12.5" y1="12.5" x2="9.4" y2="9.4"/></svg>
+          Components
+        </div>
+        <div class="nav-item" data-page="models">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v12M2 5l6 3 6-3M2 11l6 3 6-3"/></svg>
+          Models
+          <span class="badge">3</span>
+        </div>
+        <div class="nav-item" data-page="config">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3"/></svg>
+          Configuration
+        </div>
+        <div class="nav-item" data-page="logs">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h7l3 3v9H3z"/><line x1="5" y1="7" x2="11" y2="7"/><line x1="5" y1="10" x2="11" y2="10"/></svg>
+          Logs &amp; audit
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="label">Operations</div>
+        <div class="nav-item" data-page="updates">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8a6 6 0 0 1 10-4.4M14 8a6 6 0 0 1-10 4.4"/><polyline points="12,1 12,4 9,4"/><polyline points="4,15 4,12 7,12"/></svg>
+          Updates
+          <span class="badge">2</span>
+        </div>
+        <div class="nav-item" data-page="snapshots">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="9" rx="1"/><circle cx="8" cy="8.5" r="2.5"/><path d="M5 4l1-2h4l1 2"/></svg>
+          Snapshots
+        </div>
+        <div class="nav-item" data-page="repair">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2l3 3-7 7-3 1 1-3z"/><path d="M9 4l3 3"/></svg>
+          Repair mode
+        </div>
+        <div class="nav-item" data-page="security">
+          <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l6 2v5c0 4-3 6-6 7-3-1-6-3-6-7V3z"/></svg>
+          Security
+        </div>
+      </div>
+
+      <div class="sidebar-foot">
+        <div class="runtime-status">
+          <div><span class="pulse"></span>nemoclaw · running</div>
+          <div class="uptime">uptime 2h 14m · pid 4128</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main" id="main-content">
+      <!-- page content -->
+    </main>
+  </div>
+</div>
+
+</div><!-- /stage -->
+
+<!-- Drawer (model details) -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+
+<!-- Toast host -->
+<div class="toast-host" id="toast-host"></div>
+
+<script>
+/* ===========================================================
+   STATE
+   =========================================================== */
+const state = {
+  step: 0,
+  installChannel: 'stable',
+  deps: {
+    wsl2: { name: 'WSL2 + Ubuntu 22.04', version: '2.1.5', desc: 'Linux subsystem for the agent runtime', checked: true, status: 'detected' },
+    docker: { name: 'Docker Desktop', version: '4.27.2', desc: 'Container engine for the sandbox gateway', checked: true, status: 'detected' },
+    ollama: { name: 'Ollama', version: '0.5.7', desc: 'Local model runtime', checked: true, status: 'missing' },
+    claw: { name: 'OpenClaw / NemoClaw core', version: '0.4.2', desc: 'Agent runtime binaries (signed)', checked: true, status: 'missing' },
+  },
+};
+
+/* ===========================================================
+   WIZARD STEPS
+   =========================================================== */
+const steps = [
+  // 0. Welcome
+  () => `
+    <div class="step-eyebrow">step 01 — welcome</div>
+    <h1 class="step-heading">Install OpenClaw <em>without</em> the headache.</h1>
+    <p class="step-lede">ClawFrame replaces the CLI install dance with a guided, signed, reversible setup. Every choice is explained, every change is reversible, and nothing leaves your machine unless you say so.</p>
+
+    <div class="detect-grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="detect-card ok">
+        <div class="detect-icon">01</div>
+        <div class="detect-body">
+          <div class="detect-label">Detect</div>
+          <div class="detect-value">Environment first</div>
+        </div>
+      </div>
+      <div class="detect-card ok">
+        <div class="detect-icon">02</div>
+        <div class="detect-body">
+          <div class="detect-label">Install</div>
+          <div class="detect-value">Signed dependencies</div>
+        </div>
+      </div>
+      <div class="detect-card ok">
+        <div class="detect-icon">03</div>
+        <div class="detect-body">
+          <div class="detect-label">Explain</div>
+          <div class="detect-value">Every decision</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-footer">
+      <button class="btn ghost">Read docs</button>
+      <button class="btn primary" onclick="nextStep()">Begin setup <span class="arrow">→</span></button>
+      <span class="meta">est. 6 min · ~ 2.4 GB download</span>
+    </div>
+  `,
+
+  // 1. System Scan
+  () => `
+    <div class="step-eyebrow">step 02 — system scan</div>
+    <h1 class="step-heading">Looking around your <em>machine</em>.</h1>
+    <p class="step-lede">ClawFrame inspects your OS, hardware, and network to choose sensible defaults. Nothing is changed yet.</p>
+
+    <div class="detect-grid">
+      <div class="detect-card ok">
+        <div class="detect-icon">OS</div>
+        <div class="detect-body">
+          <div class="detect-label">Operating system</div>
+          <div class="detect-value">Windows 11 Pro · 24H2</div>
+        </div>
+        <div class="detect-status ok">supported</div>
+      </div>
+      <div class="detect-card ok">
+        <div class="detect-icon">CPU</div>
+        <div class="detect-body">
+          <div class="detect-label">Processor</div>
+          <div class="detect-value">Intel i7-13700K · 24 cores</div>
+        </div>
+        <div class="detect-status ok">ok</div>
+      </div>
+      <div class="detect-card ok">
+        <div class="detect-icon">GPU</div>
+        <div class="detect-body">
+          <div class="detect-label">Graphics</div>
+          <div class="detect-value">NVIDIA RTX 4070 · 12 GB</div>
+        </div>
+        <div class="detect-status ok">cuda 12.4</div>
+      </div>
+      <div class="detect-card ok">
+        <div class="detect-icon">RAM</div>
+        <div class="detect-body">
+          <div class="detect-label">Memory</div>
+          <div class="detect-value">32 GB · 18 GB free</div>
+        </div>
+        <div class="detect-status ok">ok</div>
+      </div>
+      <div class="detect-card warn">
+        <div class="detect-icon">DISK</div>
+        <div class="detect-body">
+          <div class="detect-label">Storage (C:)</div>
+          <div class="detect-value">312 GB free of 1 TB</div>
+        </div>
+        <div class="detect-status warn">tight for full</div>
+      </div>
+      <div class="detect-card ok">
+        <div class="detect-icon">NET</div>
+        <div class="detect-body">
+          <div class="detect-label">Network</div>
+          <div class="detect-value">Egress reachable · 84 ms</div>
+        </div>
+        <div class="detect-status ok">ok</div>
+      </div>
+    </div>
+
+    <div class="wizard-footer">
+      <button class="btn" onclick="prevStep()"><span class="arrow">←</span> Back</button>
+      <button class="btn primary" onclick="nextStep()">Continue <span class="arrow">→</span></button>
+      <span class="meta">scan completed in 1.2s</span>
+    </div>
+  `,
+
+  // 2. Install location
+  () => `
+    <div class="step-eyebrow">step 03 — install location</div>
+    <h1 class="step-heading">Where should ClawFrame <em>live</em>?</h1>
+    <p class="step-lede">Pick an install path with enough room for models, snapshots, and audit logs. You can move this later from the console.</p>
+
+    <div style="border:1px solid var(--line); border-radius:6px; background:var(--bg-1); padding:18px; margin-bottom: 20px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="font-family:var(--mono); font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em;">data directory</div>
+        <div style="flex:1;"></div>
+        <button class="btn" style="padding:5px 12px; font-size:12px;">Browse…</button>
+      </div>
+      <div style="font-family:var(--mono); font-size:14px; color:var(--text-0); margin-top:8px; padding:10px 12px; background:var(--bg-0); border-radius:4px; border:1px solid var(--line);">C:\\ProgramData\\ClawFrame\\</div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-top:20px;">
+        <div>
+          <div style="font-family:var(--mono); font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em;">required</div>
+          <div style="font-family:var(--display); font-size:22px; font-weight:600; letter-spacing:-0.02em; margin-top:4px;">14.2 <span style="font-family:var(--mono); font-size:11px; color:var(--text-3);">GB</span></div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono); font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em;">recommended</div>
+          <div style="font-family:var(--display); font-size:22px; font-weight:600; letter-spacing:-0.02em; margin-top:4px; color:var(--accent);">42 <span style="font-family:var(--mono); font-size:11px; color:var(--text-3);">GB</span></div>
+        </div>
+        <div>
+          <div style="font-family:var(--mono); font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em;">available</div>
+          <div style="font-family:var(--display); font-size:22px; font-weight:600; letter-spacing:-0.02em; margin-top:4px;">312 <span style="font-family:var(--mono); font-size:11px; color:var(--text-3);">GB</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-footer">
+      <button class="btn" onclick="prevStep()"><span class="arrow">←</span> Back</button>
+      <button class="btn primary" onclick="nextStep()">Continue <span class="arrow">→</span></button>
+      <span class="meta">snapshot will be created at C:\\…\\snapshots\\</span>
+    </div>
+  `,
+
+  // 3. Dependencies
+  () => `
+    <div class="step-eyebrow">step 04 — dependencies</div>
+    <h1 class="step-heading">Approve what gets <em>installed</em>.</h1>
+    <p class="step-lede">Each dependency is fetched from a verified source, signed, and checksummed before install. Uncheck anything you'd rather wire up yourself.</p>
+
+    <div class="dep-list" id="dep-list">
+      ${Object.entries(state.deps).map(([k, d]) => `
+        <div class="dep-row">
+          <div class="dep-check ${d.checked ? 'checked' : ''}" onclick="toggleDep('${k}')"></div>
+          <div class="dep-name">${d.name}<span class="dep-desc">${d.desc}</span></div>
+          <div class="dep-version">${d.version}</div>
+          <div class="dep-status ${d.status === 'missing' ? 'missing' : ''}">${d.status === 'missing' ? '↓ install' : '✓ detected'}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div style="font-family:var(--mono); font-size:11px; color:var(--text-3); margin-bottom: 20px;">
+      Total download: ~2.4 GB · all packages SHA256-verified · SBOM available after install
+    </div>
+
+    <div class="wizard-footer">
+      <button class="btn" onclick="prevStep()"><span class="arrow">←</span> Back</button>
+      <button class="btn primary" onclick="nextStep()">Continue <span class="arrow">→</span></button>
+    </div>
+  `,
+
+  // 4. Channel & runtime
+  () => `
+    <div class="step-eyebrow">step 05 — channel &amp; runtime</div>
+    <h1 class="step-heading">Pick your <em>channel</em>.</h1>
+    <p class="step-lede">Stable is what we recommend for daily work. Beta gets new features earlier with smoke-tested builds. Dev is bleeding edge — for tinkerers.</p>
+
+    <div class="channel-grid">
+      <div class="channel-card ${state.installChannel === 'stable' ? 'selected' : ''}" onclick="pickChannel('stable')">
+        <div class="channel-tag">channel · recommended</div>
+        <div class="channel-name">Stable</div>
+        <div class="channel-version">v0.4.2 · released 18d ago</div>
+        <div class="channel-desc">Pinned versions. Canary-tested. Slow updates. The default.</div>
+      </div>
+      <div class="channel-card ${state.installChannel === 'beta' ? 'selected' : ''}" onclick="pickChannel('beta')">
+        <div class="channel-tag">channel</div>
+        <div class="channel-name">Beta</div>
+        <div class="channel-version">v0.5.0-rc.3 · 2d ago</div>
+        <div class="channel-desc">New features early. Staged rollout. Expect occasional friction.</div>
+      </div>
+      <div class="channel-card ${state.installChannel === 'dev' ? 'selected' : ''}" onclick="pickChannel('dev')">
+        <div class="channel-tag">channel · advanced</div>
+        <div class="channel-name">Dev</div>
+        <div class="channel-version">nightly · 4h ago</div>
+        <div class="channel-desc">Bleeding edge. Things break. You like that.</div>
+      </div>
+    </div>
+
+    <div class="wizard-footer">
+      <button class="btn" onclick="prevStep()"><span class="arrow">←</span> Back</button>
+      <button class="btn primary" onclick="nextStep()">Continue <span class="arrow">→</span></button>
+      <span class="meta">channel can be changed any time from the console</span>
+    </div>
+  `,
+
+  // 5. Models
+  () => `
+    <div class="step-eyebrow">step 06 — models &amp; benchmark</div>
+    <h1 class="step-heading">Choose your <em>local</em> models.</h1>
+    <p class="step-lede">All models run through Ollama on your machine by default. We'll benchmark each one against your hardware so you know what to expect.</p>
+
+    <div class="dep-list">
+      <div class="dep-row" style="grid-template-columns: 36px 1fr auto auto auto;">
+        <div class="dep-check checked"></div>
+        <div class="dep-name">Llama 3.1 8B<span class="dep-desc">general-purpose · q4_K_M quantization · 4.7 GB</span></div>
+        <div class="dep-version">~ 38 tok/s</div>
+        <div class="dep-version" style="color:var(--ok); border-color:rgba(74,210,154,0.3);">good fit</div>
+      </div>
+      <div class="dep-row" style="grid-template-columns: 36px 1fr auto auto auto;">
+        <div class="dep-check checked"></div>
+        <div class="dep-name">Qwen 2.5 Coder 7B<span class="dep-desc">code &amp; tooling · q4_K_M · 4.4 GB</span></div>
+        <div class="dep-version">~ 42 tok/s</div>
+        <div class="dep-version" style="color:var(--ok); border-color:rgba(74,210,154,0.3);">good fit</div>
+      </div>
+      <div class="dep-row" style="grid-template-columns: 36px 1fr auto auto auto;">
+        <div class="dep-check"></div>
+        <div class="dep-name">Llama 3.1 70B<span class="dep-desc">flagship · q4_K_M · 40 GB</span></div>
+        <div class="dep-version">~ 4 tok/s</div>
+        <div class="dep-version" style="color:var(--warn); border-color:rgba(255,184,77,0.3);">tight on VRAM</div>
+      </div>
+      <div class="dep-row" style="grid-template-columns: 36px 1fr auto auto auto;">
+        <div class="dep-check"></div>
+        <div class="dep-name">Nomic Embed v1.5<span class="dep-desc">embeddings · 274 MB</span></div>
+        <div class="dep-version">—</div>
+        <div class="dep-version">optional</div>
+      </div>
+    </div>
+
+    <div class="wizard-footer">
+      <button class="btn" onclick="prevStep()"><span class="arrow">←</span> Back</button>
+      <button class="btn primary" onclick="nextStep()">Continue <span class="arrow">→</span></button>
+    </div>
+  `,
+
+  // 6. Integrations
+  () => `
+    <div class="step-eyebrow">step 07 — integrations</div>
+    <h1 class="step-heading">Wire up <em>messaging</em> &amp; tools.</h1>
+    <p class="step-lede">Optional. Tokens are stored in the OS keychain (Windows DPAPI on this machine). You can skip this and add them later.</p>
+
+    <div style="display:grid; gap:10px; margin-bottom: 24px;">
+      ${[
+        ['Telegram bot token', 'Send/receive via bot'],
+        ['Discord bot token', 'Discord channels'],
+        ['Slack bot token', 'Slack workspace'],
+        ['GitHub PAT', 'Updates &amp; releases'],
+      ].map(([n, d]) => `
+        <div style="border:1px solid var(--line); border-radius:6px; background:var(--bg-1); padding:14px 16px; display:flex; align-items:center; gap:14px;">
+          <div style="flex:1;">
+            <div style="font-size:13px; font-weight:500;">${n}</div>
+            <div style="font-size:12px; color:var(--text-3); margin-top:2px;">${d}</div>
+          </div>
+          <input type="password" placeholder="paste token" style="flex:1; max-width:240px; background:var(--bg-0); border:1px solid var(--line); border-radius:4px; color:var(--text-0); padding:7px 10px; font-family:var(--mono); font-size:12px;" />
+          <button class="btn" style="padding:6px 12px; font-size:12px;">validate</button>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="wizard-footer">
+      <button class="btn" onclick="prevStep()"><span class="arrow">←</span> Back</button>
+      <button class="btn ghost" onclick="nextStep()">Skip for now</button>
+      <button class="btn primary" onclick="nextStep()">Continue <span class="arrow">→</span></button>
+    </div>
+  `,
+
+  // 7. Security & policy
+  () => `
+    <div class="step-eyebrow">step 08 — security &amp; policy</div>
+    <h1 class="step-heading">Lock it <em>down</em>, sensibly.</h1>
+    <p class="step-lede">Defaults are deny-by-default for egress and tools. You can loosen any of these later from <code style="font-family:var(--mono); font-size:13px; color:var(--accent);">Configuration → Policy</code>.</p>
+
+    ${[
+      ['Egress policy', 'Default-deny outbound. Allowlist required.', 'recommended'],
+      ['Sandbox runtime', 'Run agent in WSL bridge with least-privilege.', 'recommended'],
+      ['Audit log retention', '30 days · field-redacted · local-only', '30 days'],
+      ['No public AI APIs by default', 'External AI only via approved brokered endpoints.', 'enabled'],
+    ].map(([n, d, val]) => `
+      <div style="border:1px solid var(--line); border-radius:6px; background:var(--bg-1); padding:16px; display:flex; align-items:center; gap:16px; margin-bottom:8px;">
+        <div style="flex:1;">
+          <div style="font-size:13px; font-weight:500;">${n}</div>
+          <div style="font-size:12px; color:var(--text-3); margin-top:2px;">${d}</div>
+        </div>
+        <div style="font-family:var(--mono); font-size:11px; color:var(--accent); padding:4px 10px; border:1px solid rgba(196,240,74,0.3); border-radius:100px; background:rgba(196,240,74,0.05);">${val}</div>
+      </div>
+    `).join('')}
+
+    <div class="wizard-footer" style="margin-top:32px;">
+      <button class="btn" onclick="prevStep()"><span class="arrow">←</span> Back</button>
+      <button class="btn primary" onclick="nextStep()">Continue <span class="arrow">→</span></button>
+    </div>
+  `,
+
+  // 8. Review
+  () => `
+    <div class="step-eyebrow">step 09 — review</div>
+    <h1 class="step-heading">One last <em>look</em>.</h1>
+    <p class="step-lede">Everything below will be installed, configured, and snapshotted. Nothing has been changed yet.</p>
+
+    <div style="border:1px solid var(--line); border-radius:6px; background:var(--bg-1); overflow:hidden;">
+      ${[
+        ['Install path', 'C:\\ProgramData\\ClawFrame\\'],
+        ['Channel', state.installChannel + ' · v0.4.2'],
+        ['Runtime', 'NemoClaw core (signed)'],
+        ['Models', 'Llama 3.1 8B, Qwen 2.5 Coder 7B'],
+        ['Dependencies', 'WSL2, Docker, Ollama'],
+        ['Egress policy', 'default-deny + allowlist'],
+        ['Snapshot', 'will be created before install'],
+        ['Total download', '~ 9.6 GB'],
+      ].map(([k, v], i) => `
+        <div style="display:grid; grid-template-columns: 200px 1fr; padding:14px 18px; ${i < 7 ? 'border-bottom:1px solid var(--line);' : ''} font-size:13px;">
+          <div style="font-family:var(--mono); font-size:11px; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em; padding-top:1px;">${k}</div>
+          <div style="color:var(--text-0); font-family:${k === 'Install path' ? 'var(--mono)' : 'var(--sans)'};">${v}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="wizard-footer">
+      <button class="btn" onclick="prevStep()"><span class="arrow">←</span> Back</button>
+      <button class="btn primary" onclick="nextStep()">Install <span class="arrow">→</span></button>
+      <span class="meta">est. 4–6 min</span>
+    </div>
+  `,
+
+  // 9. Install + complete
+  () => `
+    <div class="step-eyebrow" id="install-eyebrow">step 10 — installing</div>
+    <h1 class="step-heading" id="install-heading">Building your <em>frame</em>.</h1>
+    <p class="step-lede" id="install-lede">Sit tight. Each step is signed, verified, and reversible. We'll snapshot before any system change.</p>
+
+    <div class="install-meta">
+      <span id="install-stage">preparing snapshot…</span>
+      <span id="install-pct">0%</span>
+    </div>
+    <div class="install-progress"><div class="bar" id="progress-bar"></div></div>
+
+    <div class="install-log" id="install-log"></div>
+
+    <div class="wizard-footer" id="install-footer" style="display:none;">
+      <button class="btn primary" onclick="enterConsole()">Open ClawFrame Console <span class="arrow">→</span></button>
+    </div>
+  `,
+];
+
+/* ===========================================================
+   WIZARD CONTROL
+   =========================================================== */
+function renderStep() {
+  document.getElementById('wizard-content').innerHTML = steps[state.step]();
+  document.querySelectorAll('#step-list li').forEach(li => {
+    const s = +li.dataset.step;
+    li.classList.toggle('current', s === state.step);
+    li.classList.toggle('done', s < state.step);
+  });
+  document.getElementById('crumb-state').textContent = `Setup · step ${state.step + 1}/10`;
+  document.querySelector('.wizard-main').scrollTop = 0;
+  if (state.step === 9) runInstall();
+}
+
+function nextStep() {
+  if (state.step < 9) state.step++;
+  renderStep();
+}
+function prevStep() {
+  if (state.step > 0) state.step--;
+  renderStep();
+}
+function jumpStep(i) {
+  state.step = i;
+  renderStep();
+}
+function toggleDep(k) {
+  state.deps[k].checked = !state.deps[k].checked;
+  renderStep();
+}
+function pickChannel(c) {
+  state.installChannel = c;
+  renderStep();
+}
+
+document.getElementById('step-list').addEventListener('click', (e) => {
+  const li = e.target.closest('li');
+  if (li) {
+    const s = +li.dataset.step;
+    if (s <= state.step + 1) jumpStep(s);
+  }
+});
+
+/* ===========================================================
+   INSTALL ANIMATION
+   =========================================================== */
+const installSteps = [
+  { pct: 5, stage: 'creating snapshot', tag: 'SNAP', msg: 'snapshot \"pre-install-2026-04-24\" created' },
+  { pct: 12, stage: 'verifying signatures', tag: 'SIGN', msg: 'signature ok · clawframe-installer-0.4.2.msi · ed25519' },
+  { pct: 18, stage: 'WSL2 + Ubuntu 22.04', tag: 'WSL2', msg: 'WSL2 already enabled · skipping' },
+  { pct: 28, stage: 'Docker Desktop', tag: 'DOCK', msg: 'docker engine 4.27.2 detected · ok' },
+  { pct: 40, stage: 'Ollama 0.5.7', tag: 'OLLA', msg: 'ollama installed to C:\\Users\\…\\AppData\\Local\\Ollama' },
+  { pct: 52, stage: 'pulling llama3.1:8b', tag: 'PULL', msg: 'llama3.1:8b · 4.7 GB · sha256 verified' },
+  { pct: 68, stage: 'pulling qwen2.5-coder:7b', tag: 'PULL', msg: 'qwen2.5-coder:7b · 4.4 GB · sha256 verified' },
+  { pct: 78, stage: 'NemoClaw core 0.4.2', tag: 'CORE', msg: 'extracting nemoclaw runtime · 184 files' },
+  { pct: 86, stage: 'configuring sandbox', tag: 'SBOX', msg: 'sandbox bridge configured · least-privilege profile' },
+  { pct: 94, stage: 'applying policies', tag: 'POL', msg: 'egress: default-deny · allowlist with 3 entries' },
+  { pct: 98, stage: 'smoke tests', tag: 'TEST', msg: 'runtime ping ok · model load ok · sandbox ok', kind: 'ok' },
+  { pct: 100, stage: 'done', tag: 'DONE', msg: 'install complete in 4m 48s', kind: 'ok' },
+];
+
+function runInstall() {
+  const log = document.getElementById('install-log');
+  const bar = document.getElementById('progress-bar');
+  const pctEl = document.getElementById('install-pct');
+  const stageEl = document.getElementById('install-stage');
+  log.innerHTML = '';
+  let i = 0;
+
+  function tick() {
+    if (i >= installSteps.length) {
+      // completion swap
+      document.getElementById('install-eyebrow').textContent = 'step 10 — complete';
+      document.getElementById('install-heading').innerHTML = 'Your <em>Claw</em> is framed.';
+      document.getElementById('install-lede').textContent = 'Snapshot created. Runtime is up. Two recommended next actions await in the console.';
+      document.getElementById('install-footer').style.display = 'flex';
+      return;
+    }
+    const s = installSteps[i];
+    bar.style.width = s.pct + '%';
+    pctEl.textContent = s.pct + '%';
+    stageEl.textContent = s.stage;
+    const ts = new Date().toTimeString().slice(0, 8);
+    const line = document.createElement('div');
+    line.className = 'log-line ' + (s.kind || '');
+    line.innerHTML = `<span class="ts">${ts}</span><span class="tag">[${s.tag}]</span>${s.msg}`;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+    i++;
+    setTimeout(tick, 380 + Math.random() * 300);
+  }
+  setTimeout(tick, 400);
+}
+
+function enterConsole() {
+  document.getElementById('view-wizard').classList.remove('active');
+  document.getElementById('view-console').classList.add('active');
+  document.getElementById('topbar-pill').style.display = 'inline-flex';
+  document.getElementById('crumb-state').textContent = 'Console · Overview';
+  renderConsolePage('overview');
+}
+
+function goToWizard() {
+  state.step = 0;
+  document.getElementById('view-console').classList.remove('active');
+  document.getElementById('view-wizard').classList.add('active');
+  document.getElementById('topbar-pill').style.display = 'none';
+  renderStep();
+}
+
+/* ===========================================================
+   CONSOLE
+   =========================================================== */
+const consolePages = {
+  overview: () => `
+    <div class="main-header">
+      <div>
+        <div class="eyebrow">workspace · nemoclaw</div>
+        <h1>Overview <em>—</em> running quietly.</h1>
+      </div>
+      <div class="actions">
+        <button class="btn">Snapshot</button>
+        <button class="btn primary">Open chat <span class="arrow">→</span></button>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-label">Tokens / sec</div>
+        <div class="stat-value">42<span class="stat-unit">tok/s</span></div>
+        <div class="stat-trend up">↑ 3.2% vs last hour</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Active sessions</div>
+        <div class="stat-value">7</div>
+        <div class="stat-trend">2 idle, 5 streaming</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Memory · runtime</div>
+        <div class="stat-value">6.4<span class="stat-unit">GB</span></div>
+        <div class="stat-trend">of 32 GB allocated</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Egress · 24h</div>
+        <div class="stat-value">0<span class="stat-unit">unauth</span></div>
+        <div class="stat-trend up">policy holding</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Throughput · last 60 min</h3>
+          <span class="panel-meta">tokens/sec · llama3.1:8b</span>
+        </div>
+        <div class="sparkline">${sparklineSVG()}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Quick actions</h3>
+        </div>
+        <div class="quick-actions">
+          <button class="quick-action">
+            <div class="qa-name">Pull a new model</div>
+            <div class="qa-desc">ollama pull …</div>
+          </button>
+          <button class="quick-action">
+            <div class="qa-name">Validate connectors</div>
+            <div class="qa-desc">test all tokens</div>
+          </button>
+          <button class="quick-action">
+            <div class="qa-name">Export support bundle</div>
+            <div class="qa-desc">redacted · zip</div>
+          </button>
+          <button class="quick-action">
+            <div class="qa-name">Edit egress allowlist</div>
+            <div class="qa-desc">3 entries</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Components</h3>
+          <span class="panel-meta">5 healthy · 0 degraded</span>
+        </div>
+        <table class="component-table">
+          <thead><tr><th>Component</th><th>Version</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="name">NemoClaw core</td>
+              <td class="v">0.4.2</td>
+              <td><span class="status-pill running"><span class="dot"></span>running</span></td>
+              <td style="color:var(--text-3); font-family:var(--mono); font-size:11px;">2h 14m</td>
+            </tr>
+            <tr>
+              <td class="name">Ollama</td>
+              <td class="v">0.5.7</td>
+              <td><span class="status-pill running"><span class="dot"></span>running</span></td>
+              <td style="color:var(--text-3); font-family:var(--mono); font-size:11px;">2h 14m</td>
+            </tr>
+            <tr>
+              <td class="name">Sandbox bridge</td>
+              <td class="v">wsl-1.2.5</td>
+              <td><span class="status-pill running"><span class="dot"></span>running</span></td>
+              <td style="color:var(--text-3); font-family:var(--mono); font-size:11px;">2h 14m</td>
+            </tr>
+            <tr>
+              <td class="name">Docker engine</td>
+              <td class="v">4.27.2</td>
+              <td><span class="status-pill idle"><span class="dot"></span>idle</span></td>
+              <td style="color:var(--text-3); font-family:var(--mono); font-size:11px;">—</td>
+            </tr>
+            <tr>
+              <td class="name">Telemetry agent</td>
+              <td class="v">0.4.2</td>
+              <td><span class="status-pill warn"><span class="dot"></span>local-only</span></td>
+              <td style="color:var(--text-3); font-family:var(--mono); font-size:11px;">no upload</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Recent activity</h3>
+          <span class="panel-meta">last 30 min</span>
+        </div>
+        <div class="activity">
+          <div class="activity-item">
+            <div class="activity-time">14:42</div>
+            <div class="activity-msg"><span class="tag">CONFIG</span><b>Egress allowlist</b> updated — added <code style="font-family:var(--mono); color:var(--accent);">api.github.com</code></div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-time">14:31</div>
+            <div class="activity-msg"><span class="tag">MODEL</span>Pulled <b>qwen2.5-coder:7b</b> · 4.4 GB · sha256 verified</div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-time">14:18</div>
+            <div class="activity-msg"><span class="tag">SNAP</span>Snapshot <b>pre-config-change</b> created (auto)</div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-time">13:54</div>
+            <div class="activity-msg"><span class="tag">RUN</span>NemoClaw runtime started · pid 4128</div>
+          </div>
+          <div class="activity-item">
+            <div class="activity-time">13:54</div>
+            <div class="activity-msg"><span class="tag">INST</span>Install complete in 4m 48s · 9.6 GB downloaded</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ribbon">
+      <span><b>2 updates available</b> · 0.4.3 (patch) · 0.5.0-rc.3 (beta)</span>
+      <span style="color:var(--text-3);">| safe-mode rollback ready · last snapshot 14:18</span>
+      <span class="ribbon-spacer"></span>
+      <a href="#">View update notes →</a>
+    </div>
+  `,
+
+  components: () => emptyPage('Components', 'detailed graph of every installed component, version, and dependency'),
+  models: () => renderModelsPage(),
+  config: () => emptyPage('Configuration', 'live-edit settings · revert · diff against last applied'),
+  logs: () => emptyPage('Logs &amp; audit', 'human-readable audit trail · filter, search, export support bundle'),
+  updates: () => emptyPage('Updates', 'channel switch · staged rollouts · canary status'),
+  snapshots: () => emptyPage('Snapshots', 'point-in-time restore · auto-snapshots before any change'),
+  repair: () => emptyPage('Repair mode', 'safe-mode launch · diagnose without changing settings'),
+  security: () => emptyPage('Security', 'policy packs · secrets vault · RBAC · signed package status'),
+};
+
+function emptyPage(title, desc) {
+  return `
+    <div class="main-header">
+      <div>
+        <div class="eyebrow">section</div>
+        <h1>${title}</h1>
+      </div>
+    </div>
+    <div class="empty-page">
+      <h4>${title}</h4>
+      <p style="margin-bottom: 16px; max-width: 420px; margin-left:auto; margin-right:auto;">${desc}</p>
+      <code>// page scaffolded · iterate next</code>
+    </div>
+  `;
+}
+
+function renderConsolePage(page) {
+  document.getElementById('main-content').innerHTML = consolePages[page]();
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.classList.toggle('active', n.dataset.page === page);
+  });
+  const labels = {overview: 'Overview', components: 'Components', models: 'Models', config: 'Configuration', logs: 'Logs', updates: 'Updates', snapshots: 'Snapshots', repair: 'Repair', security: 'Security'};
+  document.getElementById('crumb-state').textContent = 'Console · ' + labels[page];
+  document.querySelector('.main').scrollTop = 0;
+}
+
+document.querySelectorAll('.nav-item').forEach(n => {
+  n.addEventListener('click', () => {
+    renderConsolePage(n.dataset.page);
+    if (window.innerWidth <= 860) toggleSidebar(false);
+  });
+});
+
+/* ===========================================================
+   SPARKLINE
+   =========================================================== */
+function sparklineSVG() {
+  const w = 600, h = 140, p = 8;
+  const pts = [];
+  let v = 38;
+  for (let i = 0; i <= 60; i++) {
+    v += (Math.random() - 0.5) * 6;
+    v = Math.max(28, Math.min(52, v));
+    pts.push(v);
+  }
+  const max = Math.max(...pts), min = Math.min(...pts);
+  const x = i => p + (i * (w - 2*p)) / 60;
+  const y = vv => p + ((max - vv) / (max - min)) * (h - 24);
+  const path = pts.map((vv, i) => (i === 0 ? 'M' : 'L') + x(i) + ',' + y(vv)).join(' ');
+  const area = path + ` L${x(60)},${h - 8} L${x(0)},${h - 8} Z`;
+
+  return `
+    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#c4f04a" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#c4f04a" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <line x1="${p}" y1="${h-8}" x2="${w-p}" y2="${h-8}" stroke="#232831" stroke-width="1"/>
+      <line x1="${p}" y1="${h*0.5}" x2="${w-p}" y2="${h*0.5}" stroke="#232831" stroke-dasharray="2,4" stroke-width="1"/>
+      <path d="${area}" fill="url(#g1)"/>
+      <path d="${path}" stroke="#c4f04a" stroke-width="1.5" fill="none"/>
+      <text x="${p}" y="${h-1}" class="axis-label">60m ago</text>
+      <text x="${w-p-22}" y="${h-1}" class="axis-label">now</text>
+      <text x="${w-p-30}" y="${y(max)-3}" class="axis-label">${max.toFixed(0)} t/s</text>
+    </svg>
+  `;
+}
+
+/* ===========================================================
+   MOBILE SIDEBAR
+   =========================================================== */
+function toggleSidebar(force) {
+  const sb = document.getElementById('sidebar');
+  const bd = document.getElementById('sidebar-backdrop');
+  const next = typeof force === 'boolean' ? force : !sb.classList.contains('open');
+  sb.classList.toggle('open', next);
+  bd.classList.toggle('open', next);
+}
+
+/* ===========================================================
+   TOAST
+   =========================================================== */
+function toast(msg, kind = 'ok', ms = 3200) {
+  const host = document.getElementById('toast-host');
+  const el = document.createElement('div');
+  el.className = 'toast ' + kind;
+  const icon = kind === 'warn'
+    ? '<svg class="toast-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1L15 14H1z"/><line x1="8" y1="6" x2="8" y2="9"/><circle cx="8" cy="11.5" r="0.5" fill="currentColor"/></svg>'
+    : '<svg class="toast-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2,8 6,12 14,4"/></svg>';
+  el.innerHTML = icon + '<span>' + msg + '</span>';
+  host.appendChild(el);
+  setTimeout(() => {
+    el.style.transition = 'opacity 0.3s';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 300);
+  }, ms);
+}
+
+/* ===========================================================
+   DRAWER
+   =========================================================== */
+function openDrawer(html) {
+  const d = document.getElementById('drawer');
+  const o = document.getElementById('drawer-overlay');
+  d.innerHTML = html;
+  d.classList.add('open');
+  o.classList.add('open');
+  d.setAttribute('aria-hidden', 'false');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.getElementById('drawer').setAttribute('aria-hidden', 'true');
+}
+
+/* ===========================================================
+   MODELS — DATA + API ADAPTER
+   ===========================================================
+   This adapter is the ONLY place that should talk to Ollama.
+   To make this prototype real, swap mockApi.* with fetches to
+   http://localhost:11434/api/* — same shapes.
+   =========================================================== */
+
+const modelCatalog = [
+  { id: 'llama3.1:8b', name: 'Llama 3.1', variant: '8B Instruct', publisher: 'Meta', family: 'llama', size_gb: 4.7, params: '8B', quant: 'Q4_K_M', context: 128000, desc: 'General-purpose chat and reasoning. Strong baseline for most tasks.', tags: ['general', 'chat'], fit: 'good', perf: 38, installed: true, default: true, pinned: true },
+  { id: 'qwen2.5-coder:7b', name: 'Qwen 2.5 Coder', variant: '7B', publisher: 'Alibaba', family: 'qwen', size_gb: 4.4, params: '7B', quant: 'Q4_K_M', context: 32768, desc: 'Specialized for code generation, completion, and tool use.', tags: ['code', 'tools'], fit: 'good', perf: 42, installed: true, default: false, pinned: true },
+  { id: 'nomic-embed-text:v1.5', name: 'Nomic Embed', variant: 'v1.5', publisher: 'Nomic', family: 'embed', size_gb: 0.27, params: '137M', quant: 'F16', context: 8192, desc: 'Fast text embeddings for retrieval and search.', tags: ['embed'], fit: 'good', perf: null, installed: true, default: false, pinned: false },
+  { id: 'llama3.1:70b', name: 'Llama 3.1', variant: '70B Instruct', publisher: 'Meta', family: 'llama', size_gb: 40, params: '70B', quant: 'Q4_K_M', context: 128000, desc: 'Flagship Llama. Slow on consumer GPUs without offload.', tags: ['general', 'flagship'], fit: 'tight', perf: 4, installed: false },
+  { id: 'mistral:7b', name: 'Mistral', variant: '7B Instruct v0.3', publisher: 'Mistral AI', family: 'mistral', size_gb: 4.1, params: '7B', quant: 'Q4_K_M', context: 32768, desc: 'Compact, capable, fast. A reliable alternative to Llama 8B.', tags: ['general', 'chat'], fit: 'good', perf: 44, installed: false },
+  { id: 'phi4:14b', name: 'Phi-4', variant: '14B', publisher: 'Microsoft', family: 'phi', size_gb: 8.4, params: '14B', quant: 'Q4_K_M', context: 16384, desc: 'Strong reasoning at small size. Good for analytical tasks.', tags: ['reasoning', 'chat'], fit: 'good', perf: 22, installed: false },
+  { id: 'gemma3:12b', name: 'Gemma 3', variant: '12B', publisher: 'Google', family: 'gemma', size_gb: 7.3, params: '12B', quant: 'Q4_K_M', context: 8192, desc: 'Multilingual generalist with image input support.', tags: ['general', 'vision'], fit: 'good', perf: 26, installed: false },
+  { id: 'deepseek-r1:8b', name: 'DeepSeek R1', variant: '8B Distill', publisher: 'DeepSeek', family: 'deepseek', size_gb: 4.9, params: '8B', quant: 'Q4_K_M', context: 32768, desc: 'Reasoning-focused. Shows chain of thought before final answer.', tags: ['reasoning'], fit: 'good', perf: 32, installed: false },
+  { id: 'qwen2.5-coder:32b', name: 'Qwen 2.5 Coder', variant: '32B', publisher: 'Alibaba', family: 'qwen', size_gb: 19, params: '32B', quant: 'Q4_K_M', context: 32768, desc: 'Top-tier local coding model. Heavy but excellent.', tags: ['code', 'tools'], fit: 'tight', perf: 9, installed: false },
+  { id: 'llava:13b', name: 'LLaVA', variant: '13B', publisher: 'LLaVA', family: 'llava', size_gb: 7.4, params: '13B', quant: 'Q4_K_M', context: 4096, desc: 'Vision + language. Describe and analyze images locally.', tags: ['vision'], fit: 'good', perf: 18, installed: false },
+];
+
+const totalDiskGB = 460;
+const usedSystemGB = 148;
+
+const modelsState = {
+  tab: 'installed',           // 'installed' | 'catalog'
+  search: '',
+  filter: 'all',              // all | chat | code | reasoning | vision | embed
+  pulling: {},                // id → {pct, eta, mb}
+  selectedId: null,
+};
+
+/*  Mock API — drop-in replaceable with real Ollama calls.
+    Real-world equivalents are commented next to each method.        */
+const mockApi = {
+  // GET http://localhost:11434/api/tags
+  list: async () => modelCatalog.filter(m => m.installed),
+
+  // POST /api/pull  { name }   (streams JSON lines: status, total, completed)
+  pull: (id, onProgress, onDone) => {
+    const m = modelCatalog.find(x => x.id === id);
+    if (!m) return;
+    const totalMB = Math.round(m.size_gb * 1024);
+    let mb = 0;
+    modelsState.pulling[id] = { pct: 0, eta: '—', mb: 0, totalMB };
+    const tick = () => {
+      // simulate variable network speed
+      const step = 25 + Math.random() * 80;
+      mb = Math.min(totalMB, mb + step);
+      const pct = Math.round((mb / totalMB) * 100);
+      const remaining = totalMB - mb;
+      const eta = remaining > 0 ? Math.ceil(remaining / 60) + 's' : 'done';
+      modelsState.pulling[id] = { pct, eta, mb: Math.round(mb), totalMB };
+      onProgress(modelsState.pulling[id]);
+      if (mb >= totalMB) {
+        delete modelsState.pulling[id];
+        m.installed = true;
+        onDone();
+      } else {
+        setTimeout(tick, 220 + Math.random() * 180);
+      }
+    };
+    setTimeout(tick, 300);
+  },
+
+  // DELETE /api/delete  { name }
+  remove: async (id) => {
+    const m = modelCatalog.find(x => x.id === id);
+    if (m) {
+      m.installed = false;
+      m.default = false;
+      m.pinned = false;
+    }
+  },
+
+  // No native equivalent — would call /api/generate with a small fixed prompt
+  // and measure tokens/sec, time-to-first-token, total latency.
+  benchmark: (id, onTick, onDone) => {
+    const stages = [
+      { label: 'load', detail: 'loading weights into VRAM', t: 800 },
+      { label: 'warm', detail: 'warming KV cache', t: 500 },
+      { label: 'prompt', detail: 'tokenizing 256-token prompt', t: 300 },
+      { label: 'generate', detail: 'streaming 256 tokens', t: 1400 },
+    ];
+    let i = 0;
+    function step() {
+      if (i >= stages.length) {
+        const m = modelCatalog.find(x => x.id === id);
+        const result = {
+          tps: m && m.perf ? m.perf + (Math.random() * 4 - 2) : 30 + Math.random() * 10,
+          ttft: 0.18 + Math.random() * 0.4,
+          load_s: 0.6 + Math.random() * 1.4,
+          vram_gb: m ? Math.round(m.size_gb * 1.15 * 10) / 10 : 5,
+        };
+        onDone(result);
+        return;
+      }
+      onTick(stages[i]);
+      setTimeout(step, stages[i].t);
+      i++;
+    }
+    step();
+  },
+};
+
+/* ===========================================================
+   MODELS PAGE — RENDER
+   =========================================================== */
+function renderModelsPage() {
+  setTimeout(() => bindModelsPage(), 0);
+  return `
+    <div class="main-header">
+      <div>
+        <div class="eyebrow">workspace · models</div>
+        <h1>Models</h1>
+      </div>
+      <div class="actions">
+        <button class="btn" id="bench-default-btn">Benchmark default</button>
+        <button class="btn primary" id="browse-catalog-btn">Browse catalog <span class="arrow">→</span></button>
+      </div>
+    </div>
+
+    ${storagePanelHTML()}
+
+    <div class="models-tabs" id="models-tabs">
+      <button class="models-tab ${modelsState.tab === 'installed' ? 'active' : ''}" data-tab="installed">
+        Installed <span class="tab-count" id="installed-count">${modelCatalog.filter(m => m.installed).length}</span>
+      </button>
+      <button class="models-tab ${modelsState.tab === 'catalog' ? 'active' : ''}" data-tab="catalog">
+        Catalog <span class="tab-count">${modelCatalog.length}</span>
+      </button>
+    </div>
+
+    <div class="models-toolbar">
+      <input type="text" class="search-input" id="model-search" placeholder="Search models…" value="${escapeHtml(modelsState.search)}" />
+      ${['all', 'chat', 'code', 'reasoning', 'vision', 'embed'].map(f => `
+        <button class="filter-chip ${modelsState.filter === f ? 'active' : ''}" data-filter="${f}">${f}</button>
+      `).join('')}
+    </div>
+
+    <div id="models-grid"></div>
+  `;
+}
+
+function storagePanelHTML() {
+  const installed = modelCatalog.filter(m => m.installed);
+  const modelsGB = installed.reduce((s, m) => s + m.size_gb, 0);
+  const freeGB = totalDiskGB - usedSystemGB - modelsGB;
+  const sysPct = (usedSystemGB / totalDiskGB) * 100;
+  const modelsPct = (modelsGB / totalDiskGB) * 100;
+  const freePct = 100 - sysPct - modelsPct;
+  return `
+    <div class="storage-panel">
+      <div>
+        <div class="storage-meta">total models</div>
+        <div class="storage-num">${modelsGB.toFixed(1)} <span class="unit">GB on disk</span></div>
+      </div>
+      <div class="storage-bar">
+        <div class="storage-bar-seg" style="width:${sysPct}%; background:var(--bg-3);"></div>
+        <div class="storage-bar-seg" style="width:${modelsPct}%; background:var(--accent);"></div>
+        <div class="storage-bar-seg" style="width:${freePct}%; background:transparent;"></div>
+      </div>
+      <div class="storage-legend">
+        <span class="leg"><span class="sw" style="background:var(--bg-3);"></span>system ${usedSystemGB} GB</span>
+        <span class="leg"><span class="sw" style="background:var(--accent);"></span>models ${modelsGB.toFixed(1)} GB</span>
+        <span class="leg"><span class="sw" style="background:var(--line); border:1px dashed var(--line-bright);"></span>free ${freeGB.toFixed(0)} GB</span>
+      </div>
+    </div>
+  `;
+}
+
+function modelCardHTML(m) {
+  const installed = m.installed;
+  const pulling = modelsState.pulling[m.id];
+  const initials = m.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const fitClass = m.fit === 'good' ? 'fit-good' : m.fit === 'tight' ? 'fit-tight' : 'fit-bad';
+  const fitLabel = m.fit === 'good' ? 'good fit' : m.fit === 'tight' ? 'tight on VRAM' : 'won\'t fit';
+
+  return `
+    <div class="model-card ${installed ? 'installed' : ''}" data-model-id="${m.id}">
+      ${m.pinned ? '<div class="pin-marker" title="Pinned">★</div>' : ''}
+      <div class="model-card-head">
+        <div class="model-icon">${initials}</div>
+        <div style="flex:1; min-width:0;">
+          <div class="model-name">${m.name} <span style="color:var(--text-3); font-weight:400;">${m.variant}</span></div>
+          <div class="model-publisher">${m.publisher} · ${m.id}</div>
+        </div>
+      </div>
+      <div class="model-desc">${m.desc}</div>
+      <div class="model-meta">
+        <span class="model-tag size">${m.size_gb} GB</span>
+        <span class="model-tag">${m.params}</span>
+        <span class="model-tag">${m.quant}</span>
+        <span class="model-tag ${fitClass}">${fitLabel}</span>
+        ${m.default ? '<span class="model-tag" style="background:rgba(196,240,74,0.1); color:var(--accent);">default</span>' : ''}
+      </div>
+
+      ${pulling ? `
+        <div class="pull-progress">
+          <div class="pull-progress-bar"><div style="width:${pulling.pct}%"></div></div>
+          <div class="pull-progress-meta">
+            <span>${pulling.mb} / ${pulling.totalMB} MB</span>
+            <span>${pulling.pct}% · ${pulling.eta}</span>
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="model-card-foot">
+        <div class="model-perf">${m.perf ? `<b>${m.perf}</b> tok/s` : 'embedding model'}</div>
+        <div style="flex:1;"></div>
+        ${installed
+          ? `<button class="btn btn-sm" data-act="benchmark" data-id="${m.id}">Benchmark</button>
+             <button class="btn btn-sm" data-act="details" data-id="${m.id}">Details</button>`
+          : pulling
+            ? `<button class="btn btn-sm" disabled>Pulling…</button>`
+            : `<button class="btn btn-sm primary" data-act="pull" data-id="${m.id}">Pull <span class="arrow">↓</span></button>
+               <button class="btn btn-sm" data-act="details" data-id="${m.id}">Details</button>`
+        }
+      </div>
+    </div>
+  `;
+}
+
+function paintModelGrid() {
+  const grid = document.getElementById('models-grid');
+  if (!grid) return;
+  let list = modelCatalog;
+  if (modelsState.tab === 'installed') list = list.filter(m => m.installed);
+  if (modelsState.search) {
+    const q = modelsState.search.toLowerCase();
+    list = list.filter(m => (m.name + ' ' + m.id + ' ' + m.publisher + ' ' + m.desc).toLowerCase().includes(q));
+  }
+  if (modelsState.filter !== 'all') {
+    list = list.filter(m => m.tags.includes(modelsState.filter));
+  }
+
+  if (list.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-page" style="margin-top:0;">
+        <h4>Nothing here yet</h4>
+        <p style="margin-bottom:16px;">${modelsState.tab === 'installed' ? 'Pull a model from the Catalog to get started.' : 'Try a different search or filter.'}</p>
+        ${modelsState.tab === 'installed' ? '<button class="btn primary" onclick="switchModelTab(\'catalog\')">Browse catalog →</button>' : ''}
+      </div>
+    `;
+    return;
+  }
+
+  grid.innerHTML = `<div class="model-grid">${list.map(modelCardHTML).join('')}</div>`;
+}
+
+function switchModelTab(t) {
+  modelsState.tab = t;
+  document.querySelectorAll('.models-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  document.getElementById('installed-count').textContent = modelCatalog.filter(m => m.installed).length;
+  paintModelGrid();
+}
+
+function bindModelsPage() {
+  // tabs
+  document.querySelectorAll('.models-tab').forEach(b => {
+    b.addEventListener('click', () => switchModelTab(b.dataset.tab));
+  });
+  // search
+  const s = document.getElementById('model-search');
+  if (s) {
+    s.addEventListener('input', (e) => {
+      modelsState.search = e.target.value;
+      paintModelGrid();
+    });
+  }
+  // filter chips
+  document.querySelectorAll('.filter-chip').forEach(c => {
+    c.addEventListener('click', () => {
+      modelsState.filter = c.dataset.filter;
+      document.querySelectorAll('.filter-chip').forEach(x => x.classList.toggle('active', x === c));
+      paintModelGrid();
+    });
+  });
+  // header buttons
+  document.getElementById('browse-catalog-btn')?.addEventListener('click', () => switchModelTab('catalog'));
+  document.getElementById('bench-default-btn')?.addEventListener('click', () => {
+    const def = modelCatalog.find(m => m.default && m.installed);
+    if (def) openBenchmarkDrawer(def.id);
+    else toast('No default model set. Pin one first.', 'warn');
+  });
+
+  // click delegation on grid
+  document.getElementById('models-grid')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (btn) {
+      const id = btn.dataset.id;
+      const act = btn.dataset.act;
+      if (act === 'pull') startPull(id);
+      else if (act === 'details') openModelDrawer(id);
+      else if (act === 'benchmark') openBenchmarkDrawer(id);
+      return;
+    }
+    const card = e.target.closest('.model-card');
+    if (card) openModelDrawer(card.dataset.modelId);
+  });
+
+  paintModelGrid();
+}
+
+function startPull(id) {
+  const m = modelCatalog.find(x => x.id === id);
+  if (!m) return;
+  if (modelsState.pulling[id]) return;
+  toast('Pulling ' + m.name + ' ' + m.variant + ' · ' + m.size_gb + ' GB');
+  paintModelGrid();
+  mockApi.pull(id,
+    (p) => { paintModelGrid(); },
+    () => {
+      toast(m.name + ' ' + m.variant + ' installed · sha256 verified', 'ok');
+      switchModelTab('installed');
+    }
+  );
+}
+
+/* === Drawer: model details === */
+function openModelDrawer(id) {
+  const m = modelCatalog.find(x => x.id === id);
+  if (!m) return;
+  modelsState.selectedId = id;
+
+  const html = `
+    <div class="drawer-header">
+      <button class="drawer-close" onclick="closeDrawer()" aria-label="Close">×</button>
+      <div class="drawer-title">${m.name} ${m.variant}</div>
+      <div class="drawer-subtitle">${m.id} · ${m.publisher}</div>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-section">
+        <div class="drawer-section-label">about</div>
+        <p>${m.desc}</p>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-label">specs</div>
+        <div class="drawer-stat-grid">
+          <div class="drawer-stat"><div class="ds-label">parameters</div><div class="ds-value">${m.params}</div></div>
+          <div class="drawer-stat"><div class="ds-label">quantization</div><div class="ds-value">${m.quant}</div></div>
+          <div class="drawer-stat"><div class="ds-label">size on disk</div><div class="ds-value">${m.size_gb}<span class="unit">GB</span></div></div>
+          <div class="drawer-stat"><div class="ds-label">context</div><div class="ds-value">${(m.context/1000).toFixed(0)}<span class="unit">K tokens</span></div></div>
+          ${m.perf ? `<div class="drawer-stat"><div class="ds-label">est. throughput</div><div class="ds-value">${m.perf}<span class="unit">tok/s</span></div></div>` : ''}
+          <div class="drawer-stat"><div class="ds-label">hardware fit</div><div class="ds-value" style="font-size:13px;">${m.fit === 'good' ? 'good fit' : m.fit === 'tight' ? 'tight on VRAM' : 'won\'t fit'}</div></div>
+        </div>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-label">tags</div>
+        <div class="model-meta">
+          ${m.tags.map(t => `<span class="model-tag">${t}</span>`).join('')}
+        </div>
+      </div>
+
+      ${m.installed ? `
+      <div class="drawer-section">
+        <div class="drawer-section-label">manifest</div>
+        <div class="bench-card">
+          <div class="bench-line"><span>sha256</span><b>a1f8…3d92</b></div>
+          <div class="bench-line"><span>installed</span><b>2026-04-24 13:54</b></div>
+          <div class="bench-line"><span>last used</span><b>2 min ago</b></div>
+          <div class="bench-line"><span>pinned version</span><b>${m.id}</b></div>
+        </div>
+      </div>` : ''}
+    </div>
+    <div class="drawer-foot">
+      ${m.installed ? `
+        <button class="btn btn-sm primary" onclick="openBenchmarkDrawer('${m.id}')">Benchmark</button>
+        <button class="btn btn-sm" onclick="setDefault('${m.id}')">${m.default ? '✓ Default' : 'Set default'}</button>
+        <button class="btn btn-sm" onclick="togglePin('${m.id}')">${m.pinned ? '★ Unpin' : 'Pin version'}</button>
+        <div style="flex:1;"></div>
+        <button class="btn btn-sm" style="border-color:rgba(255,107,91,0.3); color:var(--danger);" onclick="confirmRemove('${m.id}')">Remove</button>
+      ` : `
+        <button class="btn btn-sm primary" onclick="startPull('${m.id}'); closeDrawer();">Pull ${m.size_gb} GB <span class="arrow">↓</span></button>
+        <button class="btn btn-sm" onclick="closeDrawer()">Close</button>
+      `}
+    </div>
+  `;
+  openDrawer(html);
+}
+
+/* === Drawer: benchmark runner === */
+function openBenchmarkDrawer(id) {
+  const m = modelCatalog.find(x => x.id === id);
+  if (!m) return;
+
+  const html = `
+    <div class="drawer-header">
+      <button class="drawer-close" onclick="closeDrawer()">×</button>
+      <div class="drawer-title">Benchmark</div>
+      <div class="drawer-subtitle">${m.name} ${m.variant} · ${m.id}</div>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-section">
+        <div class="drawer-section-label">test</div>
+        <p>256-token prompt → 256 token generation. Run on local hardware. No data leaves the machine.</p>
+      </div>
+
+      <div class="drawer-section">
+        <div class="drawer-section-label">progress</div>
+        <div class="bench-card" id="bench-stages"></div>
+      </div>
+
+      <div class="drawer-section" id="bench-result-wrap" style="display:none;">
+        <div class="drawer-section-label">result</div>
+        <div class="drawer-stat-grid" id="bench-result"></div>
+      </div>
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn-sm primary" id="bench-run-btn">Run benchmark</button>
+      <button class="btn btn-sm" onclick="closeDrawer()">Close</button>
+    </div>
+  `;
+  openDrawer(html);
+
+  document.getElementById('bench-run-btn').addEventListener('click', () => runBenchmark(id));
+}
+
+function runBenchmark(id) {
+  const stagesEl = document.getElementById('bench-stages');
+  const btn = document.getElementById('bench-run-btn');
+  btn.disabled = true;
+  btn.textContent = 'Running…';
+  stagesEl.innerHTML = '';
+  document.getElementById('bench-result-wrap').style.display = 'none';
+
+  const lines = [];
+  mockApi.benchmark(id,
+    (s) => {
+      lines.push(`<div class="bench-line live"><span>[${s.label}]</span><b>${s.detail}</b></div>`);
+      stagesEl.innerHTML = lines.join('');
+    },
+    (r) => {
+      lines.push(`<div class="bench-line"><span>[done]</span><b style="color:var(--accent);">complete · ${r.tps.toFixed(1)} tok/s</b></div>`);
+      stagesEl.innerHTML = lines.join('');
+      const wrap = document.getElementById('bench-result-wrap');
+      wrap.style.display = 'block';
+      document.getElementById('bench-result').innerHTML = `
+        <div class="drawer-stat"><div class="ds-label">throughput</div><div class="ds-value">${r.tps.toFixed(1)}<span class="unit">tok/s</span></div></div>
+        <div class="drawer-stat"><div class="ds-label">time to first token</div><div class="ds-value">${r.ttft.toFixed(2)}<span class="unit">s</span></div></div>
+        <div class="drawer-stat"><div class="ds-label">load time</div><div class="ds-value">${r.load_s.toFixed(2)}<span class="unit">s</span></div></div>
+        <div class="drawer-stat"><div class="ds-label">VRAM used</div><div class="ds-value">${r.vram_gb}<span class="unit">GB</span></div></div>
+      `;
+      btn.disabled = false;
+      btn.textContent = 'Run again';
+      const m = modelCatalog.find(x => x.id === id);
+      if (m) m.perf = Math.round(r.tps);
+      toast('Benchmark complete · ' + r.tps.toFixed(1) + ' tok/s');
+    }
+  );
+}
+
+function setDefault(id) {
+  modelCatalog.forEach(m => m.default = false);
+  const m = modelCatalog.find(x => x.id === id);
+  if (m) m.default = true;
+  toast('Default model set to ' + m.name + ' ' + m.variant);
+  closeDrawer();
+  paintModelGrid();
+}
+
+function togglePin(id) {
+  const m = modelCatalog.find(x => x.id === id);
+  if (m) {
+    m.pinned = !m.pinned;
+    toast(m.pinned ? 'Pinned ' + m.name : 'Unpinned ' + m.name);
+  }
+  closeDrawer();
+  paintModelGrid();
+}
+
+function confirmRemove(id) {
+  const m = modelCatalog.find(x => x.id === id);
+  if (!m) return;
+  if (!confirm('Remove ' + m.name + ' ' + m.variant + '? A snapshot will be created first.')) return;
+  mockApi.remove(id).then(() => {
+    toast('Removed ' + m.name + ' · snapshot saved', 'ok');
+    closeDrawer();
+    switchModelTab('installed');
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* init */
+renderStep();
+</script>
+</body>
+</html>
